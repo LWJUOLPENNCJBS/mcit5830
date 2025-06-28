@@ -1,6 +1,5 @@
 import requests
 import json
-import base64
 
 def pin_to_ipfs(data):
 	assert isinstance(data,dict), f"Error pin_to_ipfs expects a dictionary"
@@ -9,13 +8,13 @@ def pin_to_ipfs(data):
 	# Convert dictionary to JSON string
 	json_data = json.dumps(data)
 	
-	# Upload to Infura IPFS with Basic authentication
+	# Upload to Infura IPFS
 	project_id = "40fd20c85d75423692cc1eba75727f5f"
-	url = "https://ipfs.infura.io:5001/api/v0/add"
+	url = f"https://ipfs.infura.io:5001/api/v0/add"
 	files = {'file': ('data.json', json_data, 'application/json')}
-	headers = {'Authorization': f'Basic {base64.b64encode(project_id.encode()).decode()}'}
+	params = {'projectId': project_id}
 	
-	response = requests.post(url, files=files, headers=headers)
+	response = requests.post(url, files=files, params=params)
 	response.raise_for_status()
 	
 	# Extract CID from response
