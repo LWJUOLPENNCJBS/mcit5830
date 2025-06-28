@@ -8,12 +8,12 @@ def pin_to_ipfs(data):
 	# Convert dictionary to JSON string
 	json_data = json.dumps(data)
 	
-	# Upload to Infura IPFS with authentication
-	url = "https://ipfs.infura.io:5001/api/v0/add"
+	# Upload to Infura IPFS with project ID in URL
+	project_id = "40fd20c85d75423692cc1eba75727f5f"
+	url = f"https://ipfs.infura.io:5001/api/v0/add?arg={project_id}"
 	files = {'file': ('data.json', json_data, 'application/json')}
-	headers = {'Authorization': 'Bearer 40fd20c85d75423692cc1eba75727f5f'}
 	
-	response = requests.post(url, files=files, headers=headers)
+	response = requests.post(url, files=files)
 	response.raise_for_status()
 	
 	# Extract CID from response
