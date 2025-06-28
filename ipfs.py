@@ -26,12 +26,10 @@ def get_from_ipfs(cid,content_type="json"):
 	assert isinstance(cid,str), f"get_from_ipfs accepts a cid in the form of a string"
 	#YOUR CODE HERE	
 	
-	# Retrieve data from Infura IPFS using cat endpoint with authentication
-	url = f"https://ipfs.infura.io:5001/api/v0/cat"
-	params = {'arg': cid}
-	headers = {'Authorization': 'Bearer 40fd20c85d75423692cc1eba75727f5f'}
+	# Retrieve data from public IPFS gateway
+	url = f"https://ipfs.io/ipfs/{cid}"
 	
-	response = requests.post(url, params=params, headers=headers)
+	response = requests.get(url)
 	response.raise_for_status()
 	
 	# Parse JSON response
