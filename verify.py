@@ -16,7 +16,7 @@ def sign_challenge( challenge ):
     acct = w3.eth.account.from_key(sk)
 
     signed_message = w3.eth.account.sign_message( challenge, private_key = acct.key )
-
+ 
     return acct.address, signed_message.signature
 
 
