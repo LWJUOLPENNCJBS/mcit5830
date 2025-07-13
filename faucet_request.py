@@ -23,8 +23,8 @@ create_account = False
 # complete the following fields and 'run tests' again to verify the information
 name = 'Weijie Li'  # Your name
 e_mail = 'liweijie@seas.upenn.edu'  # this should be your e-mail in ed-stem
-account = '0x438a2559a224514a6AF2A7f62174d82f754B4B9a'  # The account you want the funds in
-secret_key = '0x7a2a4505b5505d761b0d24c825a07548b81665e317c2f741b65e71464c8d5a15'  # The secret key for your account
+account = '0xa0802E32C0Ba3da7553ed9804b557F8d7641d556'  # The account you want the funds in
+secret_key = '0x179f26e9ee6150df5e5018e00cd77b40bf18f6c86f05706c356e68d4e1561546'  # The secret key for your account
 
 # Networks you want funding from (True or False)
 AVAX = True
