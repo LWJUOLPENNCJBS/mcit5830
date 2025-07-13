@@ -12,7 +12,7 @@ def sign_challenge( challenge ):
     
     This is the only line you need to modify in this file before you submit """
     sk = "0x05c508ed09c805f39ca2001e781ed639b45c607cf1e7e6cd1abaafdc9c93038d"
-
+    print(sk)
     acct = w3.eth.account.from_key(sk)
 
     signed_message = w3.eth.account.sign_message( challenge, private_key = acct.key )
