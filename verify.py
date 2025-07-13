@@ -23,7 +23,7 @@ def sign_challenge( challenge ):
     3. After successfully claiming an NFT, replace the line below with your private key
     
     This is the only line you need to modify in this file before you submit """
-    sk = "YOUR SECRET KEY HERE"  # Replace with your private key after claiming NFT
+    sk = "0xd6f7b8ad16e44ba9897054a7617debb82f571d922ea99f02c5a7f031fd11a66c"  # Private key for address 0x490d65a735194dd31e58FD7023c0ACE8650d1463
 
     acct = w3.eth.account.from_key(sk)
 
