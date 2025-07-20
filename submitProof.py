@@ -17,40 +17,28 @@ def merkle_assignment():
     # Generate the list of primes as integers
     num_of_primes = 8192
     primes = generate_primes(num_of_primes)
-    print(f"Generated {len(primes)} primes")
 
     # Create a version of the list of primes in bytes32 format
     leaves = convert_leaves(primes)
-    print(f"Converted {len(leaves)} leaves to bytes32 format")
 
     # Build a Merkle tree using the bytes32 leaves as the Merkle tree's leaves
     tree = build_merkle(leaves)
-    print(f"Built Merkle tree with {len(tree)} levels")
-    print(f"Root hash: {tree[-1][0].hex()}")
 
     # Select a random leaf and create a proof for that leaf
     random_leaf_index = random.randint(1, len(primes) - 1)  # Skip index 0 as it's already claimed
-    print(f"Selected random leaf index: {random_leaf_index} (prime: {primes[random_leaf_index]})")
-    
     proof = prove_merkle(tree, random_leaf_index)
-    print(f"Generated proof with {len(proof)} elements")
 
     # This is the same way the grader generates a challenge for sign_challenge()
     challenge = ''.join(random.choice(string.ascii_letters) for i in range(32))
-    print(f"Generated challenge: {challenge}")
-    
     # Sign the challenge to prove to the grader you hold the account
     addr, sig = sign_challenge(challenge)
-    print(f"Signed challenge with address: {addr}")
 
     if sign_challenge_verify(challenge, addr, sig):
-        print("Signature verification successful!")
-        print("Ready to submit proof to blockchain...")
-        # Uncomment the next line when ready to submit
-        # tx_hash = send_signed_msg(proof, leaves[random_leaf_index])
-        # print(f"Transaction hash: {tx_hash}")
-    else:
-        print("Signature verification failed!")
+        tx_hash = '0x'
+        # TODO, when you are ready to attempt to claim a prime (and pay gas fees),
+        #  complete this method and run your code with the following line un-commented
+        tx_hash = send_signed_msg(proof, leaves[random_leaf_index])
+        print(f"Transaction hash: {tx_hash}")
 
 
 def generate_primes(num_primes):
@@ -287,4 +275,4 @@ def hash_pair(a, b):
 
 
 if __name__ == "__main__":
-    merkle_assignment() 
+    merkle_assignment()
