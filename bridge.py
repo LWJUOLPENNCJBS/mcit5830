@@ -34,12 +34,48 @@ def get_contract_info(chain, contract_info):
     return contracts[chain]
 
 
+def sign_and_send(contract, function, signer, argdict, confirm=True, force_nonce=0):
+    """
+    Helper function to sign and send transactions
+    """
+    w3 = contract.w3
+    nonce = w3.eth.get_transaction_count(signer.address)
+    if nonce <= force_nonce:
+        nonce = force_nonce + 1
+    
+    contract_func = getattr(contract.functions, function)
+    try:
+        tx = contract_func(**argdict).build_transaction(
+            {'nonce': nonce, 'gasPrice': w3.eth.gas_price, 'from': signer.address,
+             'gas': 10 ** 6})
+    except Exception as e:
+        print(f"ERROR: in sign_and_send, failed to build transaction (function = {function})\n{e}")
+        return None, nonce
+    
+    signed_tx = w3.eth.account.sign_transaction(tx, signer.key)
+
+    try:
+        w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    except Exception as e:
+        print(f"ERROR: in sign_and_send, failed to send transaction (function = {function})\n{e}")
+        return None, nonce
+
+    if confirm:
+        tx_receipt = w3.eth.wait_for_transaction_receipt(signed_tx.hash)
+        if tx_receipt.status:
+            print(f"SUCCESS: Transaction confirmed for '{function}' at block {tx_receipt.blockNumber}")
+        else:
+            print(f"ERROR: Transaction failed '{function}'\n{signed_tx.hash.hex()}")
+
+    return signed_tx.hash.hex(), nonce
+
+
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
         chain - (string) should be either "source" or "destination"
-        Scan the last 10 blocks of the specified chain
+        Scan the last 5 blocks of the specified chain
         Look for 'Deposit' events on the source chain and 'Unwrap' events on the destination chain
-        When Deposit events are found on the source chain, call the 'wrap' function on the destination chain
+        When Deposit events are found on the source chain, call the 'wrap' function the destination chain
         When Unwrap events are found on the destination chain, call the 'withdraw' function on the source chain
     """
 
@@ -49,9 +85,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         return 0
     
     # Load contract information
-    source_contracts = get_contract_info('source', contract_info)
-    destination_contracts = get_contract_info('destination', contract_info)
-    if not source_contracts or not destination_contracts:
+    contracts = get_contract_info(chain, contract_info)
+    if not contracts:
         return 0
     
     # Load private key
@@ -66,6 +101,10 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     source_w3 = connect_to('source')
     destination_w3 = connect_to('destination')
     
+    # Get contract info for both chains
+    source_contracts = get_contract_info('source', contract_info)
+    destination_contracts = get_contract_info('destination', contract_info)
+    
     # Create contract instances
     source_contract = source_w3.eth.contract(
         address=source_contracts['address'], 
@@ -79,116 +118,112 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     # Get the account from private key
     account = source_w3.eth.account.from_key(private_key)
     
+    # Get current block numbers
+    source_current_block = source_w3.eth.get_block_number()
+    destination_current_block = destination_w3.eth.get_block_number()
+    
+    # Track nonces for each chain to avoid replacement transaction errors
+    source_nonce = source_w3.eth.get_transaction_count(account.address)
+    destination_nonce = destination_w3.eth.get_transaction_count(account.address)
+    
     if chain == 'source':
-        # Scan last 10 blocks on source chain for Deposit events
-        current_block = source_w3.eth.get_block_number()
-        start_block = max(0, current_block - 10)
-        end_block = current_block
-        
-        print(f"Scanning blocks {start_block} to {end_block} on source chain for Deposit events")
-        
-        try:
-            # Get Deposit events from source contract
-            deposit_filter = source_contract.events.Deposit.create_filter(
-                from_block=start_block, 
-                to_block=end_block
-            )
-            deposit_events = deposit_filter.get_all_entries()
-            
-            print(f"Found {len(deposit_events)} Deposit events")
-            
-            for event in deposit_events:
-                print(f"Processing Deposit event: token={event.args['token']}, recipient={event.args['recipient']}, amount={event.args['amount']}")
+        # Scan last 5 blocks on source chain for Deposit events
+        print(f"Scanning blocks {source_current_block-4} to {source_current_block} on source chain for Deposit events")
+        for block_num in range(source_current_block-4, source_current_block+1):
+            try:
+                # Get Deposit events from source contract
+                deposit_filter = source_contract.events.Deposit.create_filter(
+                    from_block=block_num, 
+                    to_block=block_num
+                )
+                deposit_events = deposit_filter.get_all_entries()
                 
-                # Call wrap function on destination chain
-                try:
-                    # Get current nonce for destination chain
-                    nonce = destination_w3.eth.get_transaction_count(account.address)
+                for event in deposit_events:
+                    print(f"Found Deposit event: token={event.args['token']}, recipient={event.args['recipient']}, amount={event.args['amount']}")
                     
-                    # Build the wrap transaction
-                    wrap_txn = destination_contract.functions.wrap(
-                        event.args['token'],
-                        event.args['recipient'],
-                        event.args['amount']
-                    ).build_transaction({
-                        'from': account.address,
-                        'gas': 500000,  # Increased gas limit
-                        'gasPrice': destination_w3.eth.gas_price,
-                        'nonce': nonce,
-                    })
-                    
-                    # Sign and send the transaction
-                    signed_txn = destination_w3.eth.account.sign_transaction(wrap_txn, private_key)
-                    tx_hash = destination_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-                    print(f"Sent wrap transaction: {tx_hash.hex()}")
-                    
-                    # Wait for transaction to be mined
-                    receipt = destination_w3.eth.wait_for_transaction_receipt(tx_hash)
-                    if receipt.status == 1:
-                        print(f"Wrap transaction confirmed in block {receipt.blockNumber}")
-                    else:
-                        print(f"Wrap transaction failed")
-                    
-                except Exception as e:
-                    print(f"Failed to call wrap function: {e}")
-                    
-        except Exception as e:
-            print(f"Error scanning source chain: {e}")
+                    # Call wrap function on destination chain
+                    try:
+                        # Build the wrap transaction
+                        wrap_txn = destination_contract.functions.wrap(
+                            event.args['token'],
+                            event.args['recipient'],
+                            event.args['amount']
+                        ).build_transaction({
+                            'from': account.address,
+                            'gas': 300000,
+                            'gasPrice': destination_w3.eth.gas_price,
+                            'nonce': destination_nonce,
+                        })
+                        
+                        # Sign and send the transaction
+                        signed_txn = destination_w3.eth.account.sign_transaction(wrap_txn, private_key)
+                        tx_hash = destination_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+                        print(f"Sent wrap transaction: {tx_hash.hex()}")
+                        
+                        # Wait for confirmation
+                        tx_receipt = destination_w3.eth.wait_for_transaction_receipt(tx_hash)
+                        if tx_receipt.status:
+                            print(f"Wrap transaction confirmed at block {tx_receipt.blockNumber}")
+                        else:
+                            print(f"Wrap transaction failed!")
+                        
+                        # Increment nonce for next transaction
+                        destination_nonce += 1
+                        
+                    except Exception as e:
+                        print(f"Failed to call wrap function: {e}")
+                        
+            except Exception as e:
+                print(f"Error scanning block {block_num} on source chain: {e}")
     
     elif chain == 'destination':
-        # Scan last 10 blocks on destination chain for Unwrap events
-        current_block = destination_w3.eth.get_block_number()
-        start_block = max(0, current_block - 10)
-        end_block = current_block
-        
-        print(f"Scanning blocks {start_block} to {end_block} on destination chain for Unwrap events")
-        
-        try:
-            # Get Unwrap events from destination contract
-            unwrap_filter = destination_contract.events.Unwrap.create_filter(
-                from_block=start_block, 
-                to_block=end_block
-            )
-            unwrap_events = unwrap_filter.get_all_entries()
-            
-            print(f"Found {len(unwrap_events)} Unwrap events")
-            
-            for event in unwrap_events:
-                print(f"Processing Unwrap event: underlying_token={event.args['underlying_token']}, to={event.args['to']}, amount={event.args['amount']}")
+        # Scan last 5 blocks on destination chain for Unwrap events
+        print(f"Scanning blocks {destination_current_block-4} to {destination_current_block} on destination chain for Unwrap events")
+        for block_num in range(destination_current_block-4, destination_current_block+1):
+            try:
+                # Get Unwrap events from destination contract
+                unwrap_filter = destination_contract.events.Unwrap.create_filter(
+                    from_block=block_num, 
+                    to_block=block_num
+                )
+                unwrap_events = unwrap_filter.get_all_entries()
                 
-                # Call withdraw function on source chain
-                try:
-                    # Get current nonce for source chain
-                    nonce = source_w3.eth.get_transaction_count(account.address)
+                for event in unwrap_events:
+                    print(f"Found Unwrap event: underlying_token={event.args['underlying_token']}, wrapped_token={event.args['wrapped_token']}, frm={event.args['frm']}, to={event.args['to']}, amount={event.args['amount']}")
                     
-                    # Build the withdraw transaction
-                    withdraw_txn = source_contract.functions.withdraw(
-                        event.args['underlying_token'],
-                        event.args['to'],
-                        event.args['amount']
-                    ).build_transaction({
-                        'from': account.address,
-                        'gas': 500000,  # Increased gas limit
-                        'gasPrice': source_w3.eth.gas_price,
-                        'nonce': nonce,
-                    })
-                    
-                    # Sign and send the transaction
-                    signed_txn = source_w3.eth.account.sign_transaction(withdraw_txn, private_key)
-                    tx_hash = source_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-                    print(f"Sent withdraw transaction: {tx_hash.hex()}")
-                    
-                    # Wait for transaction to be mined
-                    receipt = source_w3.eth.wait_for_transaction_receipt(tx_hash)
-                    if receipt.status == 1:
-                        print(f"Withdraw transaction confirmed in block {receipt.blockNumber}")
-                    else:
-                        print(f"Withdraw transaction failed")
-                    
-                except Exception as e:
-                    print(f"Failed to call withdraw function: {e}")
-                    
-        except Exception as e:
-            print(f"Error scanning destination chain: {e}")
+                    # Call withdraw function on source chain
+                    try:
+                        # Build the withdraw transaction
+                        withdraw_txn = source_contract.functions.withdraw(
+                            event.args['underlying_token'],
+                            event.args['to'],
+                            event.args['amount']
+                        ).build_transaction({
+                            'from': account.address,
+                            'gas': 300000,
+                            'gasPrice': source_w3.eth.gas_price,
+                            'nonce': source_nonce,
+                        })
+                        
+                        # Sign and send the transaction
+                        signed_txn = source_w3.eth.account.sign_transaction(withdraw_txn, private_key)
+                        tx_hash = source_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+                        print(f"Sent withdraw transaction: {tx_hash.hex()}")
+                        
+                        # Wait for confirmation
+                        tx_receipt = source_w3.eth.wait_for_transaction_receipt(tx_hash)
+                        if tx_receipt.status:
+                            print(f"Withdraw transaction confirmed at block {tx_receipt.blockNumber}")
+                        else:
+                            print(f"Withdraw transaction failed!")
+                        
+                        # Increment nonce for next transaction
+                        source_nonce += 1
+                        
+                    except Exception as e:
+                        print(f"Failed to call withdraw function: {e}")
+                        
+            except Exception as e:
+                print(f"Error scanning block {block_num} on destination chain: {e}")
     
     return 1
