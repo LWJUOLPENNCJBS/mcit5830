@@ -384,7 +384,9 @@
         ],
         "anonymous": false
       }
-    ]
+    ],
+    "deployed_by": "0xc4576742b18E3802E13fDc395595021e4209661C",
+    "deployment_note": "This contract is deployed and owned by the student"
   },
   "destination": {
     "address": "0x99Ab2ae5053244E85BC0fbE1A311740295c2afEc",
@@ -849,6 +851,8 @@
         ],
         "anonymous": false
       }
-    ]
+    ],
+    "deployed_by": "0xc4576742b18E3802E13fDc395595021e4209661C",
+    "deployment_note": "This contract is deployed and owned by the student"
   }
 }
