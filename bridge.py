@@ -103,6 +103,9 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     # Get the account from private key
                     account = source_w3.eth.account.from_key(private_key)
                     
+                    # Get current nonce
+                    nonce = destination_w3.eth.get_transaction_count(account.address)
+                    
                     # Build the wrap transaction
                     wrap_txn = destination_contract.functions.wrap(
                         event.args['token'],
@@ -112,12 +115,12 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                         'from': account.address,
                         'gas': 200000,
                         'gasPrice': destination_w3.eth.gas_price,
-                        'nonce': destination_w3.eth.get_transaction_count(account.address),
+                        'nonce': nonce,
                     })
                     
                     # Sign and send the transaction
                     signed_txn = destination_w3.eth.account.sign_transaction(wrap_txn, private_key)
-                    tx_hash = destination_w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+                    tx_hash = destination_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
                     print(f"Sent wrap transaction: {tx_hash.hex()}")
                     
                 except Exception as e:
@@ -145,6 +148,9 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     # Get the account from private key
                     account = source_w3.eth.account.from_key(private_key)
                     
+                    # Get current nonce
+                    nonce = source_w3.eth.get_transaction_count(account.address)
+                    
                     # Build the withdraw transaction
                     withdraw_txn = source_contract.functions.withdraw(
                         event.args['underlying_token'],
@@ -154,12 +160,12 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                         'from': account.address,
                         'gas': 200000,
                         'gasPrice': source_w3.eth.gas_price,
-                        'nonce': source_w3.eth.get_transaction_count(account.address),
+                        'nonce': nonce,
                     })
                     
                     # Sign and send the transaction
                     signed_txn = source_w3.eth.account.sign_transaction(withdraw_txn, private_key)
-                    tx_hash = source_w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+                    tx_hash = source_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
                     print(f"Sent withdraw transaction: {tx_hash.hex()}")
                     
                 except Exception as e:
