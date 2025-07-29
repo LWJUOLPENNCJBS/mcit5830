@@ -34,7 +34,6 @@ def get_contract_info(chain, contract_info):
     return contracts[chain]
 
 
-
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
         chain - (string) should be either "source" or "destination"
@@ -80,9 +79,16 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         abi=destination_contracts['abi']
     )
     
+    # Get the account from private key
+    account = source_w3.eth.account.from_key(private_key)
+    
     # Get current block numbers
     source_current_block = source_w3.eth.get_block_number()
     destination_current_block = destination_w3.eth.get_block_number()
+    
+    # Track nonces for each chain to avoid replacement transaction errors
+    source_nonce = source_w3.eth.get_transaction_count(account.address)
+    destination_nonce = destination_w3.eth.get_transaction_count(account.address)
     
     # Scan last 5 blocks on source chain for Deposit events
     print(f"Scanning blocks {source_current_block-4} to {source_current_block} on source chain for Deposit events")
@@ -100,12 +106,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 
                 # Call wrap function on destination chain
                 try:
-                    # Get the account from private key
-                    account = source_w3.eth.account.from_key(private_key)
-                    
-                    # Get current nonce
-                    nonce = destination_w3.eth.get_transaction_count(account.address)
-                    
                     # Build the wrap transaction
                     wrap_txn = destination_contract.functions.wrap(
                         event.args['token'],
@@ -113,15 +113,18 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                         event.args['amount']
                     ).build_transaction({
                         'from': account.address,
-                        'gas': 200000,
+                        'gas': 300000,  # Increased gas limit
                         'gasPrice': destination_w3.eth.gas_price,
-                        'nonce': nonce,
+                        'nonce': destination_nonce,
                     })
                     
                     # Sign and send the transaction
                     signed_txn = destination_w3.eth.account.sign_transaction(wrap_txn, private_key)
                     tx_hash = destination_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
                     print(f"Sent wrap transaction: {tx_hash.hex()}")
+                    
+                    # Increment nonce for next transaction
+                    destination_nonce += 1
                     
                 except Exception as e:
                     print(f"Failed to call wrap function: {e}")
@@ -145,12 +148,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 
                 # Call withdraw function on source chain
                 try:
-                    # Get the account from private key
-                    account = source_w3.eth.account.from_key(private_key)
-                    
-                    # Get current nonce
-                    nonce = source_w3.eth.get_transaction_count(account.address)
-                    
                     # Build the withdraw transaction
                     withdraw_txn = source_contract.functions.withdraw(
                         event.args['underlying_token'],
@@ -158,15 +155,18 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                         event.args['amount']
                     ).build_transaction({
                         'from': account.address,
-                        'gas': 200000,
+                        'gas': 300000,  # Increased gas limit
                         'gasPrice': source_w3.eth.gas_price,
-                        'nonce': nonce,
+                        'nonce': source_nonce,
                     })
                     
                     # Sign and send the transaction
                     signed_txn = source_w3.eth.account.sign_transaction(withdraw_txn, private_key)
                     tx_hash = source_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
                     print(f"Sent withdraw transaction: {tx_hash.hex()}")
+                    
+                    # Increment nonce for next transaction
+                    source_nonce += 1
                     
                 except Exception as e:
                     print(f"Failed to call withdraw function: {e}")
