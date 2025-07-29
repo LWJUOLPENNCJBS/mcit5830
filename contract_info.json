@@ -384,9 +384,7 @@
         ],
         "anonymous": false
       }
-    ],
-    "deployed_by": "0xc4576742b18E3802E13fDc395595021e4209661C",
-    "deployment_note": "MY OWN deployment using Foundry - Bridge V assignment"
+    ]
   },
   "destination": {
     "address": "0x76923066063f3761E732aa2936e00de101fD38f4",
@@ -851,8 +849,6 @@
         ],
         "anonymous": false
       }
-    ],
-    "deployed_by": "0xc4576742b18E3802E13fDc395595021e4209661C",
-    "deployment_note": "MY OWN deployment using Foundry - Bridge V assignment"
+    ]
   }
 }
