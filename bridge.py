@@ -8,16 +8,16 @@ import time
 
 
 def connect_to(chain):
-    if chain == 'source':  # The source contract chain is avax
+    if chain == 'avax':  # The source contract chain is avax
         api_url = f"https://api.avax-test.network/ext/bc/C/rpc" #AVAX C-chain testnet
-
-    if chain == 'destination':  # The destination contract chain is bsc
+    elif chain == 'bsc':  # The destination contract chain is bsc
         api_url = f"https://data-seed-prebsc-1-s1.binance.org:8545/" #BSC testnet
-
-    if chain in ['source','destination']:
-        w3 = Web3(Web3.HTTPProvider(api_url))
-        # inject the poa compatibility middleware to the innermost layer
-        w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+    else:
+        raise ValueError(f"Invalid chain: {chain}")
+    
+    w3 = Web3(Web3.HTTPProvider(api_url))
+    # inject the poa compatibility middleware to the innermost layer
+    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
     return w3
 
 
@@ -73,7 +73,7 @@ def sign_and_send(contract, function, signer, argdict, confirm=True, force_nonce
 
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
-        chain - (string) should be either "source" or "destination"
+        chain - (string) should be either "avax" or "bsc"
         Scan the last 5 blocks of the specified chain
         Look for 'Deposit' events on the source chain and 'Unwrap' events on the destination chain
         When Deposit events are found on the source chain, call the 'wrap' function the destination chain
@@ -81,13 +81,14 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     """
 
     # This is different from Bridge IV where chain was "avax" or "bsc"
-    if chain not in ['source','destination']:
+    if chain not in ['avax','bsc']:
         print( f"Invalid chain: {chain}" )
         return 0
     
     # Load contract information
-    contracts = get_contract_info(chain, contract_info)
-    if not contracts:
+    source_contracts = get_contract_info('source', contract_info)
+    destination_contracts = get_contract_info('destination', contract_info)
+    if not source_contracts or not destination_contracts:
         return 0
     
     # Load private key
@@ -99,12 +100,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         return 0
     
     # Connect to both chains
-    source_w3 = connect_to('source')
-    destination_w3 = connect_to('destination')
-    
-    # Get contract info for both chains
-    source_contracts = get_contract_info('source', contract_info)
-    destination_contracts = get_contract_info('destination', contract_info)
+    source_w3 = connect_to('avax')
+    destination_w3 = connect_to('bsc')
     
     # Create contract instances
     source_contract = source_w3.eth.contract(
@@ -125,7 +122,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     
     print(f"Current blocks - Source: {source_current_block}, Destination: {destination_current_block}")
     
-    if chain == 'source':
+    if chain == 'avax':
         # Scan last 5 blocks on source chain for Deposit events
         start_block = max(0, source_current_block - 4)
         end_block = source_current_block
@@ -179,7 +176,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         except Exception as e:
             print(f"Error scanning source chain: {e}")
     
-    elif chain == 'destination':
+    elif chain == 'bsc':
         # Scan last 5 blocks on destination chain for Unwrap events
         start_block = max(0, destination_current_block - 4)
         end_block = destination_current_block
@@ -255,8 +252,8 @@ def register_tokens(contract_info="contract_info.json"):
         return 0
     
     # Connect to both chains
-    source_w3 = connect_to('source')
-    destination_w3 = connect_to('destination')
+    source_w3 = connect_to('avax')
+    destination_w3 = connect_to('bsc')
     
     # Get contract info
     source_contracts = get_contract_info('source', contract_info)
@@ -331,15 +328,15 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python bridge.py [source|destination|register]")
+        print("Usage: python bridge.py [avax|bsc|register]")
         sys.exit(1)
     
     command = sys.argv[1]
     
     if command == "register":
         register_tokens()
-    elif command in ["source", "destination"]:
+    elif command in ["avax", "bsc"]:
         scan_blocks(command)
     else:
-        print("Invalid command. Use 'source', 'destination', or 'register'")
+        print("Invalid command. Use 'avax', 'bsc', or 'register'")
         sys.exit(1)
