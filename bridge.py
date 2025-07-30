@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 import pandas as pd
 import time
+import sys
 
 
 def connect_to(chain):
@@ -505,8 +506,6 @@ def listen_and_bridge():
         print(f"\n❌ Bridge listener error: {e}")
 
 if __name__ == "__main__":
-    import sys
-    
     if len(sys.argv) < 2:
         print("Usage: python bridge.py [source|destination|register|listen]")
         sys.exit(1)
