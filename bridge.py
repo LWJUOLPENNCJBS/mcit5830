@@ -144,8 +144,12 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 
                 # Call wrap function on destination chain
                 try:
-                    # Get current nonce for destination chain
-                    current_destination_nonce = destination_w3.eth.get_transaction_count(account.address)
+                    # Get current nonce for destination chain (fresh for each transaction)
+                    current_destination_nonce = destination_w3.eth.get_transaction_count(account.address, 'pending')
+                    
+                    # Get gas price with buffer for competitive pricing
+                    base_gas_price = destination_w3.eth.gas_price
+                    gas_price = int(base_gas_price * 1.2)  # 20% higher than base
                     
                     # Build the wrap transaction
                     wrap_txn = destination_contract.functions.wrap(
@@ -155,7 +159,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     ).build_transaction({
                         'from': account.address,
                         'gas': 300000,
-                        'gasPrice': destination_w3.eth.gas_price,
+                        'gasPrice': gas_price,
                         'nonce': current_destination_nonce,
                     })
                     
@@ -198,8 +202,12 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 
                 # Call withdraw function on source chain
                 try:
-                    # Get current nonce for source chain
-                    current_source_nonce = source_w3.eth.get_transaction_count(account.address)
+                    # Get current nonce for source chain (fresh for each transaction)
+                    current_source_nonce = source_w3.eth.get_transaction_count(account.address, 'pending')
+                    
+                    # Get gas price with buffer for competitive pricing
+                    base_gas_price = source_w3.eth.gas_price
+                    gas_price = int(base_gas_price * 1.2)  # 20% higher than base
                     
                     # Build the withdraw transaction
                     withdraw_txn = source_contract.functions.withdraw(
@@ -209,7 +217,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     ).build_transaction({
                         'from': account.address,
                         'gas': 300000,
-                        'gasPrice': source_w3.eth.gas_price,
+                        'gasPrice': gas_price,
                         'nonce': current_source_nonce,
                     })
                     
@@ -280,7 +288,7 @@ def register_tokens(contract_info="contract_info.json"):
             register_txn = source_contract.functions.registerToken(token_address).build_transaction({
                 'from': account.address,
                 'gas': 200000,
-                'gasPrice': source_w3.eth.gas_price,
+                'gasPrice': int(source_w3.eth.gas_price * 1.1),  # 10% higher than base
                 'nonce': nonce,
             })
             
@@ -310,7 +318,7 @@ def register_tokens(contract_info="contract_info.json"):
             ).build_transaction({
                 'from': account.address,
                 'gas': 500000,
-                'gasPrice': destination_w3.eth.gas_price,
+                'gasPrice': int(destination_w3.eth.gas_price * 1.1),  # 10% higher than base
                 'nonce': nonce,
             })
             
@@ -404,8 +412,12 @@ def listen_and_bridge():
                             
                             # Call wrap function on destination chain
                             try:
-                                # Get current nonce for destination chain
-                                current_destination_nonce = destination_w3.eth.get_transaction_count(account.address)
+                                # Get current nonce for destination chain (fresh for each transaction)
+                                current_destination_nonce = destination_w3.eth.get_transaction_count(account.address, 'pending')
+                                
+                                # Get gas price with buffer for competitive pricing
+                                base_gas_price = destination_w3.eth.gas_price
+                                gas_price = int(base_gas_price * 1.2)  # 20% higher than base
                                 
                                 # Build the wrap transaction
                                 wrap_txn = destination_contract.functions.wrap(
@@ -415,7 +427,7 @@ def listen_and_bridge():
                                 ).build_transaction({
                                     'from': account.address,
                                     'gas': 300000,
-                                    'gasPrice': destination_w3.eth.gas_price,
+                                    'gasPrice': gas_price,
                                     'nonce': current_destination_nonce,
                                 })
                                 
@@ -462,8 +474,12 @@ def listen_and_bridge():
                             
                             # Call withdraw function on source chain
                             try:
-                                # Get current nonce for source chain
-                                current_source_nonce = source_w3.eth.get_transaction_count(account.address)
+                                # Get current nonce for source chain (fresh for each transaction)
+                                current_source_nonce = source_w3.eth.get_transaction_count(account.address, 'pending')
+                                
+                                # Get gas price with buffer for competitive pricing
+                                base_gas_price = source_w3.eth.gas_price
+                                gas_price = int(base_gas_price * 1.2)  # 20% higher than base
                                 
                                 # Build the withdraw transaction
                                 withdraw_txn = source_contract.functions.withdraw(
@@ -473,7 +489,7 @@ def listen_and_bridge():
                                 ).build_transaction({
                                     'from': account.address,
                                     'gas': 300000,
-                                    'gasPrice': source_w3.eth.gas_price,
+                                    'gasPrice': gas_price,
                                     'nonce': current_source_nonce,
                                 })
                                 
