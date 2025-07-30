@@ -327,11 +327,188 @@ def register_tokens(contract_info="contract_info.json"):
     return 1
 
 
+def listen_and_bridge():
+    """
+    Continuous event listener that bridges tokens between chains
+    """
+    print("🚀 Starting Bridge Event Listener...")
+    print("=" * 60)
+    
+    # Load private key
+    try:
+        with open('sk.txt', 'r') as f:
+            private_key = f.read().strip()
+    except Exception as e:
+        print(f"Failed to read private key: {e}")
+        return
+    
+    # Connect to both chains
+    source_w3 = connect_to('avax')
+    destination_w3 = connect_to('bsc')
+    
+    # Get contract info
+    source_contracts = get_contract_info('source', 'contract_info.json')
+    destination_contracts = get_contract_info('destination', 'contract_info.json')
+    
+    # Create contract instances
+    source_contract = source_w3.eth.contract(
+        address=source_contracts['address'], 
+        abi=source_contracts['abi']
+    )
+    destination_contract = destination_w3.eth.contract(
+        address=destination_contracts['address'], 
+        abi=destination_contracts['abi']
+    )
+    
+    # Get the account from private key
+    account = source_w3.eth.account.from_key(private_key)
+    
+    print(f"🔑 Bridge Warden: {account.address}")
+    print(f"📋 Source Contract: {source_contracts['address']}")
+    print(f"📋 Destination Contract: {destination_contracts['address']}")
+    print()
+    
+    # Track last processed blocks
+    last_source_block = source_w3.eth.get_block_number()
+    last_destination_block = destination_w3.eth.get_block_number()
+    
+    print("🎧 Listening for bridge events...")
+    print("Press Ctrl+C to stop")
+    print()
+    
+    try:
+        while True:
+            current_time = datetime.now().strftime("%H:%M:%S")
+            
+            # Check source chain for Deposit events
+            current_source_block = source_w3.eth.get_block_number()
+            if current_source_block > last_source_block:
+                start_block = last_source_block + 1
+                end_block = min(current_source_block, last_source_block + 10)  # Process max 10 blocks at a time
+                
+                print(f"[{current_time}] 🔍 Scanning Avalanche blocks {start_block}-{end_block} for Deposit events...")
+                
+                try:
+                    deposit_filter = source_contract.events.Deposit.create_filter(
+                        from_block=start_block, 
+                        to_block=end_block
+                    )
+                    deposit_events = deposit_filter.get_all_entries()
+                    
+                    if deposit_events:
+                        print(f"🎯 Found {len(deposit_events)} Deposit event(s)")
+                        
+                        for event in deposit_events:
+                            print(f"  📥 Processing Deposit: token={event.args['token']}, recipient={event.args['recipient']}, amount={event.args['amount']}")
+                            
+                            # Call wrap function on destination chain
+                            try:
+                                # Get current nonce for destination chain
+                                current_destination_nonce = destination_w3.eth.get_transaction_count(account.address)
+                                
+                                # Build the wrap transaction
+                                wrap_txn = destination_contract.functions.wrap(
+                                    event.args['token'],
+                                    event.args['recipient'],
+                                    event.args['amount']
+                                ).build_transaction({
+                                    'from': account.address,
+                                    'gas': 300000,
+                                    'gasPrice': destination_w3.eth.gas_price,
+                                    'nonce': current_destination_nonce,
+                                })
+                                
+                                # Sign and send the transaction
+                                signed_txn = destination_w3.eth.account.sign_transaction(wrap_txn, private_key)
+                                tx_hash = destination_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+                                print(f"  🔄 Sent wrap transaction: {tx_hash.hex()}")
+                                
+                                # Wait for confirmation
+                                tx_receipt = destination_w3.eth.wait_for_transaction_receipt(tx_hash)
+                                if tx_receipt.status:
+                                    print(f"  ✅ Wrap transaction confirmed at block {tx_receipt.blockNumber}")
+                                else:
+                                    print(f"  ❌ Wrap transaction failed!")
+                                
+                            except Exception as e:
+                                print(f"  ❌ Failed to call wrap function: {e}")
+                    
+                    last_source_block = end_block
+                    
+                except Exception as e:
+                    print(f"❌ Error scanning source chain: {e}")
+            
+            # Check destination chain for Unwrap events
+            current_destination_block = destination_w3.eth.get_block_number()
+            if current_destination_block > last_destination_block:
+                start_block = last_destination_block + 1
+                end_block = min(current_destination_block, last_destination_block + 10)  # Process max 10 blocks at a time
+                
+                print(f"[{current_time}] 🔍 Scanning BSC blocks {start_block}-{end_block} for Unwrap events...")
+                
+                try:
+                    unwrap_filter = destination_contract.events.Unwrap.create_filter(
+                        from_block=start_block, 
+                        to_block=end_block
+                    )
+                    unwrap_events = unwrap_filter.get_all_entries()
+                    
+                    if unwrap_events:
+                        print(f"🎯 Found {len(unwrap_events)} Unwrap event(s)")
+                        
+                        for event in unwrap_events:
+                            print(f"  📤 Processing Unwrap: underlying_token={event.args['underlying_token']}, wrapped_token={event.args['wrapped_token']}, frm={event.args['frm']}, to={event.args['to']}, amount={event.args['amount']}")
+                            
+                            # Call withdraw function on source chain
+                            try:
+                                # Get current nonce for source chain
+                                current_source_nonce = source_w3.eth.get_transaction_count(account.address)
+                                
+                                # Build the withdraw transaction
+                                withdraw_txn = source_contract.functions.withdraw(
+                                    event.args['underlying_token'],
+                                    event.args['to'],
+                                    event.args['amount']
+                                ).build_transaction({
+                                    'from': account.address,
+                                    'gas': 300000,
+                                    'gasPrice': source_w3.eth.gas_price,
+                                    'nonce': current_source_nonce,
+                                })
+                                
+                                # Sign and send the transaction
+                                signed_txn = source_w3.eth.account.sign_transaction(withdraw_txn, private_key)
+                                tx_hash = source_w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+                                print(f"  🔄 Sent withdraw transaction: {tx_hash.hex()}")
+                                
+                                # Wait for confirmation
+                                tx_receipt = source_w3.eth.wait_for_transaction_receipt(tx_hash)
+                                if tx_receipt.status:
+                                    print(f"  ✅ Withdraw transaction confirmed at block {tx_receipt.blockNumber}")
+                                else:
+                                    print(f"  ❌ Withdraw transaction failed!")
+                                
+                            except Exception as e:
+                                print(f"  ❌ Failed to call withdraw function: {e}")
+                    
+                    last_destination_block = end_block
+                    
+                except Exception as e:
+                    print(f"❌ Error scanning destination chain: {e}")
+            
+            # Wait before next scan
+            time.sleep(5)
+            
+    except KeyboardInterrupt:
+        print("\n🛑 Bridge listener stopped by user")
+    except Exception as e:
+        print(f"\n❌ Bridge listener error: {e}")
+
 if __name__ == "__main__":
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python bridge.py [source|destination|register]")
+        print("Usage: python bridge.py [source|destination|register|listen]")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -340,6 +517,8 @@ if __name__ == "__main__":
         register_tokens()
     elif command in ["source", "destination"]:
         scan_blocks(command)
+    elif command == "listen":
+        listen_and_bridge()
     else:
-        print("Invalid command. Use 'source', 'destination', or 'register'")
+        print("Invalid command. Use 'source', 'destination', 'register', or 'listen'")
         sys.exit(1)
