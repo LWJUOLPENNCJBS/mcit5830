@@ -73,7 +73,7 @@ def sign_and_send(contract, function, signer, argdict, confirm=True, force_nonce
 
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
-        chain - (string) should be either "avax" or "bsc"
+        chain - (string) should be either "source" or "destination"
         Scan the last 5 blocks of the specified chain
         Look for 'Deposit' events on the source chain and 'Unwrap' events on the destination chain
         When Deposit events are found on the source chain, call the 'wrap' function the destination chain
@@ -81,7 +81,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     """
 
     # This is different from Bridge IV where chain was "avax" or "bsc"
-    if chain not in ['avax','bsc']:
+    if chain not in ['source','destination']:
         print( f"Invalid chain: {chain}" )
         return 0
     
@@ -122,7 +122,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     
     print(f"Current blocks - Source: {source_current_block}, Destination: {destination_current_block}")
     
-    if chain == 'avax':
+    if chain == 'source':
         # Scan last 5 blocks on source chain for Deposit events
         start_block = max(0, source_current_block - 4)
         end_block = source_current_block
@@ -176,7 +176,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         except Exception as e:
             print(f"Error scanning source chain: {e}")
     
-    elif chain == 'bsc':
+    elif chain == 'destination':
         # Scan last 5 blocks on destination chain for Unwrap events
         start_block = max(0, destination_current_block - 4)
         end_block = destination_current_block
@@ -328,15 +328,15 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python bridge.py [avax|bsc|register]")
+        print("Usage: python bridge.py [source|destination|register]")
         sys.exit(1)
     
     command = sys.argv[1]
     
     if command == "register":
         register_tokens()
-    elif command in ["avax", "bsc"]:
+    elif command in ["source", "destination"]:
         scan_blocks(command)
     else:
-        print("Invalid command. Use 'avax', 'bsc', or 'register'")
+        print("Invalid command. Use 'source', 'destination', or 'register'")
         sys.exit(1)
