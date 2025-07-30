@@ -123,8 +123,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     print(f"Current blocks - Source: {source_current_block}, Destination: {destination_current_block}")
     
     if chain == 'source':
-        # Scan last 5 blocks on source chain for Deposit events
-        start_block = max(0, source_current_block - 4)
+        # Scan last 20 blocks on source chain for Deposit events
+        start_block = max(0, source_current_block - 19)
         end_block = source_current_block
         print(f"Scanning blocks {start_block} to {end_block} on source chain for Deposit events")
         
@@ -177,8 +177,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
             print(f"Error scanning source chain: {e}")
     
     elif chain == 'destination':
-        # Scan last 5 blocks on destination chain for Unwrap events
-        start_block = max(0, destination_current_block - 4)
+        # Scan last 20 blocks on destination chain for Unwrap events
+        start_block = max(0, destination_current_block - 19)
         end_block = destination_current_block
         print(f"Scanning blocks {start_block} to {end_block} on destination chain for Unwrap events")
         
@@ -340,4 +340,3 @@ if __name__ == "__main__":
     else:
         print("Invalid command. Use 'source', 'destination', or 'register'")
         sys.exit(1)
- 
